@@ -1,0 +1,104 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Query AWS MediaTailor Metrics and save data to S3
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 20
+
+Resources:
+  ## Creating Lambda role for deployment
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-LambdaRole"
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        #Very Board Access Policies, this needs to refined to just specific requirements
+        - PolicyName: !Sub "${AWS::StackName}-LambdaPolicy"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: MetricAccess
+                Effect: Allow
+                Action:
+                  - "cloudwatch:GetMetricData"
+                  - "cloudwatch:GetMetricStatistics"
+                  - "cloudwatch:ListMetrics"
+                Resource: "*"
+              - Sid: BucketAccess
+                Effect: Allow
+                Action:
+                  - "s3:PutObject"
+                  - "s3:CreateBucket"
+                  - "s3:ListBucket"
+                Resource:
+                  - "arn:aws:s3:::<Bucket_name>/*"
+                  - "arn:aws:s3:::<Bucket_name>"
+              - Sid: LoggingAccess
+                Effect: Allow
+                Action:
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                  - "logs:CreateLogGroup"
+                Resource: "*"
+
+  mtmetrics:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: mediatailor/
+      Handler: emtmetrics.lambda_handler
+      Description: "get EMT Metrics and save data to S3"
+      Runtime: python3.7
+      Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          #log level for cloudwatch Logs
+          LOG_LEVEL: info
+          #output bucket for finished files
+          DESTINATION_BUCKET: <Bucket_name>
+      Tags:
+        purpose: "<tags>"
+        built-by: "<tags>"
+        stage: "<tags>"
+        team: "<tags>"
+
+  3amDaily:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "Run at 3am Daily"
+      ScheduleExpression: "cron(0 3 * * ? *)"  # Everyday at 1am
+      State: "ENABLED"
+      Targets:
+        - Arn: !GetAtt mtmetrics.Arn
+          Id: "TargetFunctionV1" # No idea why this is needed, but it is!
+
+  PermissionForEventsToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt mtmetrics.Arn
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt 3amDaily.Arn
+
+
+Outputs:
+  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
+  # Find out more about other implicit resources you can reference within SAM
+  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
+  mtmetrics:
+    Description: "Function ARN"
+    Value: !GetAtt mtmetrics.Arn
+  mtmetricsIamRole:
+    Description: "IAM Role"
+    Value: !GetAtt mtmetrics.Arn
