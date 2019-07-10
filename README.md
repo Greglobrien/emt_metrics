@@ -7,16 +7,25 @@ AWS SAM is recommended deployment method, find more about that here: https://git
 
 Sam offers easy deployment from a local machine into AWS using template files, which will be to be adjusted for your own needs before running this tool.
 
-To Start: adjust the template file (template_.yaml) to suit your aws environment.  
-The file has indications as to what text will need to replaced using greater Than, Less Than <> signs around a given word
+To Start: adjust the template file (template_.yaml) to suit your aws environment. 
+The file has indications as to what text will need to replaced using greater Than, Less Than <> signs around a given word.
+You'll also want to create a bucket for the new logs to be deposited
 
 Once those changes have been made, the following commands can be run using SAM:
 This tool can be run locally by running the following commands:
 `sam local invoke emtmetrics --no-event`
 
 If you want to try it on AWS, use the following commands:
+
 The following command builds it for deployment, zipping up the files into an s3 location
  - `sam package --template-file template_.yaml --s3-bucket <S3_BUCKET_NAME> --output-template-file packaged.yml`
+
 This next command deploys it using cloudformation:
  - `sam deploy --template-file packaged.yml --stack-name <STACK NAME> --capabilities CAPABILITY_NAMED_IAM`
 
+After the cloudformation process is complete to AWS, you should see the various stack components under their applicable tool pages:
+	- Lambda
+	- IAM
+
+
+Any problems with the tool should be logged to cloudwatch logs with the clouformations name.  If you see ways to improve this tool don't hesitate to submit a pull request.
